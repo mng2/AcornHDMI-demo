@@ -42,6 +42,7 @@ exec 3<$1                              # redirect serial output to fd 3
   PID=$!                               # save pid to kill cat
     cat "$2" > "$1"                    # send executable to serial port
     sleep 3s                           # wait for bootloader response
+    printf "e" > $1                    # send execute command
   kill $PID                            # kill cat process
 
 exec 3<&- # free fd 3
@@ -55,5 +56,4 @@ then
 fi
 
 rm -f uart_upload.response.dat
-cat "e" > "$1"
 echo "Started execution. Done."

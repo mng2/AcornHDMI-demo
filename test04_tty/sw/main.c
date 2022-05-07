@@ -90,6 +90,9 @@ int main() {
                 neorv32_gpio_port_set(0xFF);
             } else if (rx=='x') {
                 neorv32_uart0_printf("temp: %x\n", XADC_TEMP);
+                neorv32_uart0_printf("vint: %x\n", XADC_VCCINT);
+                neorv32_uart0_printf("vaux: %x\n", XADC_VCCAUX);
+                neorv32_uart0_printf("vLTC: %x\n", XADC_LTC);
             } else {
                 neorv32_uart0_printf("Menu: enter 'r' to reboot\n");
             }
