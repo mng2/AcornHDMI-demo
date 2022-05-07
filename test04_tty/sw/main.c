@@ -45,6 +45,11 @@
 
 #define BAUD_RATE 19200
 
+#define XADC_TEMP   (*((volatile uint32_t*) (0x40000000UL)))
+#define XADC_VCCINT (*((volatile uint32_t*) (0x40000004UL)))
+#define XADC_VCCAUX (*((volatile uint32_t*) (0x40000008UL)))
+#define XADC_LTC    (*((volatile uint32_t*) (0x40000078UL)))
+
 /**********************************************************************//**
  * Main function; shows an incrementing 4-bit counter on GPIO.output(7:0).
  * Reboots when 'r' received, if GPIO 7 connected as reset.
@@ -81,8 +86,10 @@ int main() {
         if (neorv32_uart0_char_received()) {
             rx = neorv32_uart0_char_received_get();
             if (rx=='r') {
-                neorv32_uart0_printf("r recieved, rebooting!\n");
+                neorv32_uart0_printf("r received, rebooting!\n");
                 neorv32_gpio_port_set(0xFF);
+            } else if (rx=='x') {
+                neorv32_uart0_printf("temp: %x\n", XADC_TEMP);
             } else {
                 neorv32_uart0_printf("Menu: enter 'r' to reboot\n");
             }
