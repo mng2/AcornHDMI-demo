@@ -69,6 +69,9 @@ entity neorv32_bootloader_200 is
     wb_lock_o      : out std_ulogic; -- exclusive access request
     wb_ack_i       : in  std_ulogic := 'L'; -- transfer acknowledge
     wb_err_i       : in  std_ulogic := 'L'; -- transfer error
+    -- TWI --
+    twi_sda_io  : inout std_logic;
+    twi_scl_io  : inout std_logic;
     -- UART0 --
     brt0_txd_o  : out std_ulogic_vector(7 downto 0); -- UART0 send data
     brt0_rxd_i  : in  std_ulogic_vector(7 downto 0); -- UART0 receive data
@@ -84,6 +87,7 @@ architecture neorv32_test_setup_bootloader_rtl of neorv32_bootloader_200 is
     signal clkfb        : std_ulogic;
     signal mmcm_lock    : std_ulogic;  
     signal con_gpio_o   : std_ulogic_vector(63 downto 0);
+    signal neo_rstn     : std_ulogic;
 
 begin
 
@@ -188,12 +192,13 @@ begin
     -- Processor peripherals --
     IO_GPIO_EN                   => true,              -- implement general purpose input/output port unit (GPIO)?
     IO_MTIME_EN                  => true,              -- implement machine system timer (MTIME)?
+    IO_TWI_EN                    => true,              -- implement two-wire interface
     IO_BRT0_EN                   => true               -- implement primary byte receiver/transmitter (as UART0)?
   )
   port map (
     -- Global control --
     clk_i       => clk100int,       -- global clock, rising edge
-    rstn_i      => (rstn_i and mmcm_lock),  -- global reset, low-active, async
+    rstn_i      => neo_rstn,  -- global reset, low-active, async
     -- GPIO (available if IO_GPIO_EN = true) --
     gpio_o      => con_gpio_o,  -- parallel output
     -- wishbone interface --
@@ -208,14 +213,17 @@ begin
     wb_lock_o => wb_lock_o,                     -- exclusive access request
     wb_ack_i  => wb_ack_i,                      -- transfer acknowledge
     wb_err_i  => wb_err_i,                      -- transfer error
+    -- Two-Wire Interface --
+    twi_sda_io => twi_sda_io,
+    twi_scl_io => twi_scl_io,
     -- primary BRT0 (available if IO_BRT0_EN = true) --
     brt0_txd_o => brt0_txd_o, -- UART0 send data
     brt0_rxd_i => brt0_rxd_i, -- UART0 receive data
     brt0_txd_valid => brt0_txd_valid,
     brt0_rxd_valid => brt0_rxd_valid
   );
+  neo_rstn <= (rstn_i and mmcm_lock);
 
-  -- GPIO output --
   gpio_o <= con_gpio_o(7 downto 0);
 
   clk100 <= clk100int;

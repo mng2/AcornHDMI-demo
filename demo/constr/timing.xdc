@@ -1,5 +1,5 @@
 
-#create_clock -name clk200 -period 5 [get_ports CLK200_P]
+create_clock -name clk200 -period 5 [get_ports CLK200_P]
 
 create_clock -period 10.000 -name pcie_refclk [get_ports REFCLKp]
 

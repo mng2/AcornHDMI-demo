@@ -50,6 +50,16 @@
 #define XADC_VCCAUX (*((volatile uint32_t*) (0x40000008UL)))
 #define XADC_LTC    (*((volatile uint32_t*) (0x40000078UL)))
 
+#define PCA9534_I2C_ADDR    0x40 // 0x40 write / 0x41 read
+#define I2C_WRITE           0
+#define I2C_READ            1
+#define PCA9534_REG_INPUT   0x00
+#define PCA9534_REG_OUTPUT  0x01
+#define PCA9534_REG_INVERT  0x02
+#define PCA9534_REG_CONFIG  0x03
+
+void write_PCA9534_reg(uint8_t reg, uint8_t val);
+
 /**********************************************************************//**
  * Main function; shows an incrementing 4-bit counter on GPIO.output(7:0).
  * Reboots when 'r' received, if GPIO 7 connected as reset.
@@ -79,6 +89,13 @@ int main() {
     neorv32_rte_check_isa(0); // silent = 0 -> show message if isa mismatch
     // intro
     neorv32_uart0_printf("\n--- hullo world ---\n");
+    
+    // f = fmain / 4 / PRSC = 100e6 / 4 / 2048 = ~12.2 kHz
+    neorv32_twi_setup(CLK_PRSC_2048);
+    neorv32_cpu_delay_ms(100);
+    //set amber LED to output
+    write_PCA9534_reg( PCA9534_REG_CONFIG, (0xFF ^ (1 << 5)));
+    uint8_t pca_output  = 0xFF;
 
     char rx = 0;
     // Main menu
@@ -96,6 +113,8 @@ int main() {
             } else {
                 neorv32_uart0_printf("Menu: enter 'r' to reboot\n");
             }
+            pca_output ^= (1 << 5);
+            write_PCA9534_reg(PCA9534_REG_OUTPUT, pca_output);
         }
 
         // use delay_ms to do software PWM on the count
@@ -114,4 +133,16 @@ int main() {
     }
 
     return 0;
+}
+
+void 
+write_PCA9534_reg(uint8_t reg, uint8_t val) 
+{
+    int res = 0;
+    res |= neorv32_twi_start_trans(PCA9534_I2C_ADDR+I2C_WRITE); 
+    // these functions all poll busy
+    // for the moment, don't check ACK in program but maybe in future
+    res |= neorv32_twi_trans(reg);
+    res |= neorv32_twi_trans(val);
+    neorv32_twi_generate_stop();
 }

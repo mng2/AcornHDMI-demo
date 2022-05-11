@@ -29,6 +29,10 @@ set_property PACKAGE_PIN H2 [get_ports temp_LTC_P]
 set_property IOSTANDARD LVCMOS33 [get_ports temp_LTC_P]
 set_property PACKAGE_PIN G2 [get_ports temp_LTC_N]
 set_property IOSTANDARD LVCMOS33 [get_ports temp_LTC_N]
+set_property PACKAGE_PIN J5 [get_ports DVI_SDA]
+set_property IOSTANDARD LVCMOS33 [get_ports DVI_SDA]
+set_property PACKAGE_PIN J2 [get_ports DVI_SCL]
+set_property IOSTANDARD LVCMOS33 [get_ports DVI_SCL]
 
 # PCIe refclk, 100 MHz
 set_property PACKAGE_PIN F6 [get_ports REFCLKp]

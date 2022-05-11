@@ -9,6 +9,7 @@ module axi_pcie_example_top #(
     output          CLKREQn,
     input           CLK200_P, CLK200_N,
     input           temp_LTC_P, temp_LTC_N,
+    inout           DVI_SDA, DVI_SCL,
     output  [4:1]   LEDn,
     output          M2_LEDn
 );
@@ -17,7 +18,7 @@ module axi_pcie_example_top #(
     logic           sys_resetn;
     logic           mmcm_lock;
     logic           link_up;
-    (* dont_touch="true" *) logic msi_request, msi_grant, msi_enabled;
+    logic           msi_request, msi_grant, msi_enabled;
 
     logic [7:0]     uart_in_data, uart_out_data;
     logic           uart_in_valid, uart_out_valid;
@@ -155,6 +156,8 @@ module axi_pcie_example_top #(
         .wb_lock_o(     wb_neo.lock),
         .wb_ack_i(      wb_neo.ack),
         .wb_err_i(      wb_neo.err),
+        .twi_sda_io(    DVI_SDA),
+        .twi_scl_io(    DVI_SCL),
         .brt0_txd_o,
         .brt0_rxd_i,
         .brt0_txd_valid,
@@ -164,7 +167,7 @@ module axi_pcie_example_top #(
     assign LEDn = ~gpio[3:0];
 
     logic       self_reset_p1;
-    (* dont_touch="true" *) logic [3:0] self_reset_shifty = '0;
+    logic [3:0] self_reset_shifty = '0;
     always_ff @(posedge clk100) begin: pNeoSelfReset
         self_reset_p1 <= gpio[7];
         if (~self_reset_p1 & gpio[7]) // rising edge detect
