@@ -726,21 +726,6 @@ export_ip_user_files -of_objects [get_files $pcieloc/axi_pcie_x1g1.xci] -no_scri
 create_ip_run [get_files -of_objects [get_fileset sources_1] $pcieloc/axi_pcie_x1g1.xci]
 set_property strategy Flow_PerfOptimized_high [get_runs axi_pcie_x1g1_synth_1]
 set_property IS_MANAGED false [get_files $pcieloc/axi_pcie_x1g1.xci]
-# we need to edit /ip/axi_pcie_x1g1/axi_pcie_x1g1/source/axi_pcie_X0Y0.xdc
-# to set the correct lane mapping
-# hacky find/replace from https://stackoverflow.com/questions/36874745/tcl-replace-string-in-file
-cd $pcieloc/axi_pcie_x1g1/source
-set fd [open "axi_pcie_X0Y0.xdc" r]
-set newfd [open "temp.tmp" w]
-while {[gets $fd line] >= 0} {
-    set newline0 [string map {GTPE2_CHANNEL_X0Y7 SYMBOL_LANE0} $line]
-    set newline4 [string map {SYMBOL_LANE0 GTPE2_CHANNEL_X0Y6} $newline0]
-    puts $newfd $newline4
-}
-close $fd
-close $newfd
-file rename -force "temp.tmp" "axi_pcie_X0Y0.xdc"
-cd $proj_dir/..
 
 create_ip -name axi_dwidth_converter -vendor xilinx.com -library ip -module_name axi_dwconv_64_32
 set_property -dict [list CONFIG.Component_Name {axi_dwconv_64_32}\
@@ -758,9 +743,19 @@ generate_target all [get_files $iploc/axi_to_axilite.xci]
 export_ip_user_files -of_objects [get_files $iploc/axi_to_axilite.xci] -no_script -sync -force -quiet
 create_ip_run [get_files -of_objects [get_fileset sources_1] $iploc/axi_to_axilite.xci]
 
-#create_ip -name axi_gpio -vendor xilinx.com -library ip -module_name axi_gpio_leds
-#set_property -dict [list CONFIG.C_GPIO_WIDTH {4} CONFIG.Component_Name {axi_gpio_leds} CONFIG.C_ALL_OUTPUTS {1}] [get_ips axi_gpio_leds]
-#set iploc $proj_dir/$_xil_proj_name_.srcs/sources_1/ip/axi_gpio_leds
-#generate_target all [get_files $iploc/axi_gpio_leds.xci]
-#export_ip_user_files -of_objects [get_files $iploc/axi_gpio_leds.xci] -no_script -sync -force -quiet
-#create_ip_run [get_files -of_objects [get_fileset sources_1] $iploc/axi_gpio_leds.xci]
+# we need to edit /ip/axi_pcie_x1g1/axi_pcie_x1g1/source/axi_pcie_X0Y0.xdc
+# to set the correct lane mapping
+# hacky find/replace from https://stackoverflow.com/questions/36874745/tcl-replace-string-in-file
+after idle {
+cd $pcieloc/axi_pcie_x1g1/source
+set fd [open "axi_pcie_X0Y0.xdc" r]
+set newfd [open "temp.tmp" w]
+while {[gets $fd line] >= 0} {
+    set newline0 [string map {GTPE2_CHANNEL_X0Y7 SYMBOL_LANE0} $line]
+    set newline4 [string map {SYMBOL_LANE0 GTPE2_CHANNEL_X0Y6} $newline0]
+    puts $newfd $newline4
+}
+close $fd
+close $newfd
+file rename -force "temp.tmp" "axi_pcie_X0Y0.xdc"
+cd $proj_dir/.. }
