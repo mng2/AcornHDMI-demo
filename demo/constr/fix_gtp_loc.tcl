@@ -16,7 +16,15 @@ set script_dir [pwd]
 cd ../..
 set proj_dir [pwd]
 set proj_name [file tail [pwd]]
-set pcieloc $proj_dir/${proj_name}.srcs/sources_1/ip/axi_pcie_x1g1
+# Vivado 2020.2 puts unmanaged source in a different dot-dir (grr)
+set v [version]
+set ver [string range $v 8 11]
+if { $ver < 2020 } {
+    set dotdir srcs
+} else {
+    set dotdir gen
+}
+set pcieloc $proj_dir/${proj_name}.${dotdir}/sources_1/ip/axi_pcie_x1g1
 
 cd $pcieloc/axi_pcie_x1g1/source
 set fd [open "axi_pcie_X0Y0.xdc" r]
