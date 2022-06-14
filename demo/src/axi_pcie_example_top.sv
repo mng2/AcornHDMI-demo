@@ -11,7 +11,27 @@ module axi_pcie_example_top #(
     input           temp_LTC_P, temp_LTC_N,
     inout           DVI_SDA, DVI_SCL,
     output  [4:1]   LEDn,
-    output          M2_LEDn
+    output          M2_LEDn,
+    
+    output          HDMI_CK_P, HDMI_CK_N/*,
+    output          HDMI_D0_P, HDMI_D0_N,
+    output          HDMI_D1_P, HDMI_D1_N,
+    output          HDMI_D2_P, HDMI_D2_N,
+    
+    inout [15:0]    ddr3_dq,
+    inout [1:0]     ddr3_dqs_n,
+    inout [1:0]     ddr3_dqs_p,
+    output [15:0]   ddr3_addr,
+    output [2:0]    ddr3_ba,
+    output          ddr3_ras_n,
+    output          ddr3_cas_n,
+    output          ddr3_we_n,
+    output          ddr3_reset_n,
+    output [0:0]    ddr3_ck_p,
+    output [0:0]    ddr3_ck_n,
+    output [0:0]    ddr3_cke,
+    output [1:0]    ddr3_dm,
+    output [0:0]    ddr3_odt*/
 );
 
     logic           axi_clk_pcie;
@@ -130,20 +150,30 @@ module axi_pcie_example_top #(
     
     ////////////////////// NEORV32 /////////////////////////
     
-    logic       clk100;
+    logic       clk_neo;
+    logic       clk_dvi, clk_dvi5x;
+    logic       mmcm_locked;
     logic       rst_neorv32;
     logic [7:0] gpio;
     logic [7:0] brt0_txd_o, brt0_rxd_i;
     logic       brt0_txd_valid, brt0_rxd_valid;
     
-    Wishbone_intf wb_neo( .clk(clk100), .rst(rst_neorv32) );
-    
-    neorv32_bootloader_200 myneorv32
-    (
-        .CLK200_P,
+    clock_wrapper clock_wrapper_inst (
+        .CLK200_P, 
         .CLK200_N,
+        .clk_neo,    // 99 MHz
+        .clk_dvi,    // 148.5 MHz
+        .clk_dvi5x,  // 742.5 MHz
+        .mmcm_locked
+    );
+
+    Wishbone_intf wb_neo( .clk(clk_neo), .rst(rst_neorv32) );
+    
+    neorv32_bootloader_200 #(
+        .CLOCK_FREQUENCY( 99*1000*1000  )
+    ) myneorv32 (
         .rstn_i(        ~rst_neorv32    ),
-        .clk100,
+        .clk_neo,
         .gpio_o(        gpio            ),
         .wb_tag_o(      wb_neo.tag),
         .wb_adr_o(      wb_neo.adr),
@@ -168,21 +198,21 @@ module axi_pcie_example_top #(
 
     logic       self_reset_p1;
     logic [3:0] self_reset_shifty = '0;
-    always_ff @(posedge clk100) begin: pNeoSelfReset
+    always_ff @(posedge clk_neo) begin: pNeoSelfReset
         self_reset_p1 <= gpio[7];
         if (~self_reset_p1 & gpio[7]) // rising edge detect
             self_reset_shifty <= {self_reset_shifty[2:0], 1'b1};
         else
             self_reset_shifty <= {self_reset_shifty[2:0], 1'b0};
     end: pNeoSelfReset
-    assign rst_neorv32 = |self_reset_shifty;
+    assign rst_neorv32 = |self_reset_shifty | ~mmcm_locked;
 
     xpm_cdc_hs_wrap
     xpm_cdc_neo2pcie (
       .dest_out(    uart_in_data    ), 
       .dest_req(    uart_in_valid   ),
       .dest_clk(    axi_clk_pcie    ),
-      .src_clk(     clk100          ),
+      .src_clk(     clk_neo         ),
       .src_in(      brt0_txd_o      ),
       .src_send(    brt0_txd_valid  )
     );
@@ -191,12 +221,13 @@ module axi_pcie_example_top #(
     xpm_cdc_pcie2neo (
       .dest_out(    brt0_rxd_i      ), 
       .dest_req(    brt0_rxd_valid  ),
-      .dest_clk(    clk100          ),
+      .dest_clk(    clk_neo         ),
       .src_clk(     axi_clk_pcie    ),
       .src_in(      uart_out_data   ),
       .src_send(    uart_out_valid  )
     );
 
+    /* MIG needs XADC for temp cal, figure out sharing later
     XADC_Wishbone #(
         .BASE_ADDR(32'h4000_0000)
     ) xadc_inst (
@@ -206,6 +237,21 @@ module axi_pcie_example_top #(
         .overtemp(),
         .alarm()
     );
+    */
+
+    ///////////////////// HDMI/DVI ////////////////////////////
+    
+    tmds_xmitter #(
+        .invert(1'b0)
+    ) xmit_clock (
+        .clk(clk_dvi), 
+        .rst('0),
+        .clk5x(clk_dvi5x),
+        .datain(10'b1010101010),
+        .txp(HDMI_CK_P), 
+        .txn(HDMI_CK_N)
+    );
+
 
 endmodule: axi_pcie_example_top
 

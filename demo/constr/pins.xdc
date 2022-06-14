@@ -1,4 +1,5 @@
-# basic constraints for blinky, modified
+# constraints for SQRL Acorn CLE-215+
+# MIG and PCIe IPs take care of their own stuff
 
 # 200 MHz LVDS clock
 # Bank 15 is 1.5V so externally terminated
@@ -7,6 +8,24 @@ set_property PACKAGE_PIN J19 [get_ports CLK200_P]
 set_property IOSTANDARD LVDS_25 [get_ports CLK200_P]
 set_property PACKAGE_PIN H19 [get_ports CLK200_N]
 set_property IOSTANDARD LVDS_25 [get_ports CLK200_N]
+
+# Bank 34, 2.5V
+set_property PACKAGE_PIN V9 [get_ports HDMI_CK_P]
+set_property IOSTANDARD LVDS_25 [get_ports HDMI_CK_P]
+set_property PACKAGE_PIN V8 [get_ports HDMI_CK_N]
+set_property IOSTANDARD LVDS_25 [get_ports HDMI_CK_N]
+set_property PACKAGE_PIN Y8 [get_ports HDMI_D0_P]
+set_property IOSTANDARD LVDS_25 [get_ports HDMI_D0_P]
+set_property PACKAGE_PIN Y7 [get_ports HDMI_D0_N]
+set_property IOSTANDARD LVDS_25 [get_ports HDMI_D0_N]
+set_property PACKAGE_PIN Y9 [get_ports HDMI_D1_P]
+set_property IOSTANDARD LVDS_25 [get_ports HDMI_D1_P]
+set_property PACKAGE_PIN W9 [get_ports HDMI_D1_N]
+set_property IOSTANDARD LVDS_25 [get_ports HDMI_D1_N]
+set_property PACKAGE_PIN AB8 [get_ports HDMI_D2_P]
+set_property IOSTANDARD LVDS_25 [get_ports HDMI_D2_P]
+set_property PACKAGE_PIN AA8 [get_ports HDMI_D2_N]
+set_property IOSTANDARD LVDS_25 [get_ports HDMI_D2_N]
 
 # Bank 35, 3.3V
 set_property PACKAGE_PIN G3 [get_ports LEDn[1]]
