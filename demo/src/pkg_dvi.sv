@@ -1,6 +1,17 @@
 
 package pkg_dvi;
 
+    // video timing parameters for 1080p, CEA-861
+    // params are ugly but will do for now
+    parameter H_ACTIVE      = 1920;
+    parameter V_ACTIVE      = 1080;
+    parameter H_FULL        = 2200;
+    parameter V_FULL        = 1125;
+    parameter H_SYNC_START  = 2008;
+    parameter H_SYNC_END    = 2052;
+    parameter V_SYNC_START  = 1084;
+    parameter V_SYNC_END    = 1089;
+
     parameter C0 = 10'b1101010100;
     parameter C1 = 10'b0010101011;
     parameter C2 = 10'b0101010100;

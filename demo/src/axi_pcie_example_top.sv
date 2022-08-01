@@ -13,7 +13,7 @@ module axi_pcie_example_top #(
     output  [4:1]   LEDn,
     output          M2_LEDn,
     
-    output          HDMI_CK_P, HDMI_CK_N/*,
+    output          HDMI_CK_P, HDMI_CK_N,
     output          HDMI_D0_P, HDMI_D0_N,
     output          HDMI_D1_P, HDMI_D1_N,
     output          HDMI_D2_P, HDMI_D2_N,
@@ -31,7 +31,7 @@ module axi_pcie_example_top #(
     output [0:0]    ddr3_ck_n,
     output [0:0]    ddr3_cke,
     output [1:0]    ddr3_dm,
-    output [0:0]    ddr3_odt*/
+    output [0:0]    ddr3_odt
 );
 
     logic           axi_clk_pcie;
@@ -241,6 +241,28 @@ module axi_pcie_example_top #(
 
     ///////////////////// HDMI/DVI ////////////////////////////
     
+    MIG_intf #(.DW(128), .AW(30) ) 
+    mig_if();
+
+    logic framebuffer_ready, framebuffer_pull, framebuffer_valid;
+    logic [31:0]   framebuffer_data;
+
+    Framebuffer_Wishbone #(
+        .BASE_ADDR( 32'h4000_0000 )
+    ) framebuffer_inst (
+        .wb(    wb_neo),
+        .mig_if,
+        .framebuffer_ready,
+        .framebuffer_pull,
+        .framebuffer_data,
+        .framebuffer_valid,
+        .clk_dvi
+    );
+
+    mig_acorn_wrapper my_mig(
+        .* //connected to framebuffer and top level ports
+    );
+    
     tmds_xmitter #(
         .invert(1'b0)
     ) xmit_clock (
@@ -251,7 +273,7 @@ module axi_pcie_example_top #(
         .txp(HDMI_CK_P), 
         .txn(HDMI_CK_N)
     );
-
+    
 
 endmodule: axi_pcie_example_top
 
