@@ -3,13 +3,13 @@
 
 module clock_wrapper (
     input       CLK200_P, CLK200_N,
+    output      clk200,     // 200 MHz
     output      clk_neo,    // 99 MHz
     output      clk_dvi,    // 148.5 MHz
     output      clk_dvi5x,  // 742.5 MHz
     output      mmcm_locked
 );
 
-    logic clk200;
     logic clk200bufg;
     logic CLKFB;
     logic clk_dvi_int;

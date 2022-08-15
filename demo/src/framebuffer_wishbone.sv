@@ -14,8 +14,10 @@ Supported signal list:  see interface_wishbone.sv
 Special requirements:   
 */
 
+import pkg_dvi::*;
+import pkg_mig_framebuffer::*;
 
-module Framebuffer_Wishbone #(
+module framebuffer_Wishbone #(
     parameter BASE_ADDR = 32'h0000_0000
 )(
     Wishbone_intf.S wb,
@@ -23,7 +25,7 @@ module Framebuffer_Wishbone #(
     
     output logic    framebuffer_ready,
     input           framebuffer_pull,
-    output [31:0]   framebuffer_data,
+    output RGB888_t framebuffer_data,
     output          framebuffer_valid,
     input           clk_dvi
 
@@ -138,39 +140,33 @@ module Framebuffer_Wishbone #(
     end
     
     logic write_pending;
+    logic writing;
     logic write_done;
+        always @(posedge mig_if.clk) begin
+        if (mig_if.rst) begin
+            write_pending    <= '0;
+            write_done       <= '0;
+        end else begin
+            if (~write_pending & ~write_done) begin
+                if (command_reg_mig[WRITE_PIXELS]) begin
+                    write_pending <= '1;
+                end
+            end else if (writing) begin
+                write_pending    <= '0;
+                write_done       <= '1;
+            end else if (write_done & ~command_reg_mig[WRITE_PIXELS]) begin
+                write_done <= '0;
+            end
+        end
+    end
 
     /////////////////////// MIG domain ///////////////////////////////
-
-    // each framebuffer is 2048*2048*32b, 16MB or 24bits of addressing
-    localparam PIXEL_BYTES = 4;
-    localparam FRAMEBUFFER_WIDTH = 2048;
-    localparam FRAMEBUFFER_HEIGHT = 2048;
-    localparam FRAMEBUFFER_ROW_OFFSET = 2048*4;
-    localparam FRAMEBUFFER_ROW_BITS   = $clog2(FRAMEBUFFER_ROW_OFFSET)-1;
-    localparam FRAMEBUFFER_BUFFER_OFFSET = FRAMEBUFFER_ROW_OFFSET*2048;
-    localparam BUFFER_0_BASE = 0;
-    localparam BUFFER_1_BASE = FRAMEBUFFER_BUFFER_OFFSET;
     
-    localparam ADDR_READ_STEP = 16;
-    localparam COLUMN_ADDR_MAX = pkg_dvi::H_ACTIVE*4 - ADDR_READ_STEP;
-    localparam MIG_ADDR_WIDTH = 30;
-    
-    typedef struct packed {
-        logic [ MIG_ADDR_WIDTH-1
-                -$clog2(FRAMEBUFFER_HEIGHT)-1
-                -$clog2(FRAMEBUFFER_WIDTH)-1
-                -$clog2(PIXEL_BYTES)-1:0]       buffer;
-        logic [$clog2(FRAMEBUFFER_HEIGHT)-1:0]  row;
-        logic [$clog2(FRAMEBUFFER_WIDTH)-1:0]   column;
-        logic [$clog2(PIXEL_BYTES)-1:0]         pixel_data;
-    } read_pointer_t;
-    
-    read_pointer_t read_pointer;
+    framebuffer_addr_t read_pointer;
     logic increment_read_pointer;
     logic current_buffer;
     
-    always_ff @(mig_if.clk) begin
+    always_ff @(posedge mig_if.clk) begin
         if (mig_if.rst) begin
             read_pointer    <= '0;
             current_buffer  <= '0;
@@ -190,6 +186,7 @@ module Framebuffer_Wishbone #(
                     end else begin
                         read_pointer.row <= read_pointer.row + 1;
                     end
+                    read_pointer.column <= '0;
                 end else begin
                     read_pointer.column <= read_pointer.column + 4;
                 end
@@ -198,31 +195,32 @@ module Framebuffer_Wishbone #(
     end
     
     assign status_reg_mig = 32'b0 + 
+                            (write_done     << WRITE_ACK) +
                             (current_buffer << CURRENT_BUFFER) +
                             (mig_if.app_rdy << MIG_READY) +
                             (mig_if.init_calib_complete << MIG_CAL_DONE);
     
-    localparam FIFO_WRITE_WIDTH = 128;
-    localparam FIFO_WRITE_DEPTH = 256; // 1 36K BRAM
-    localparam FIFO_WRITE_COUNT_WIDTH = $clog2(FIFO_WRITE_DEPTH);
+    localparam FIFO_WRITE_WIDTH = MIG_DATA_WIDTH; // 128
+    localparam FIFO_WRITE_DEPTH = 256; // 36Kb but split over 
+    localparam FIFO_WRITE_COUNT_WIDTH = 9; // $clog2(FIFO_WRITE_DEPTH); bugged in 2019.2 sim
     localparam FIFO_READ_WIDTH = 32;
     logic [FIFO_WRITE_COUNT_WIDTH-1:0] fifo_write_count;
     
     localparam FIFO_HIGH_FILL = 200;
     localparam FIFO_LOW_FILL = 100;
     
-    always_ff @(posedge mig_if.clk) begin: p_startup_ready
-        if (mig_if.rst) begin
-            framebuffer_ready <= '0;
-        end else if (fifo_write_count > FIFO_HIGH_FILL) begin
-            framebuffer_ready <= '1;
+    // write buffer and pointer first, plus
+    // command synchronizer path is enough datapath delay by itself
+    (* ASYNC_REG = "TRUE" *) logic [127:0] pixel_buffer_cdc;
+    (* ASYNC_REG = "TRUE" *) logic [31:0] pointer_reg_cdc;
+    always_ff @(posedge mig_if.clk) begin
+        if (write_pending) begin
+            pixel_buffer_cdc    <= pixel_buffer;
+            pointer_reg_cdc     <= pointer_reg;
         end
-    end: p_startup_ready
+    end
 
-    localparam MIG_CMD_READ =   3'b001;
-    localparam MIG_CMD_WRITE =  3'b000;
     logic do_read, do_write;
-    
     always_comb begin: p_mig_control
         do_read = '0;
         do_write = '0;
@@ -244,7 +242,7 @@ module Framebuffer_Wishbone #(
             increment_read_pointer = '1;
         end else if (do_write) begin
             mig_if.app_en          = '1;
-            mig_if.app_addr        = pointer_reg; //timing datapath only
+            mig_if.app_addr        = pointer_reg_cdc;
             mig_if.app_wdf_wren    = '1;
             mig_if.app_cmd         = MIG_CMD_WRITE;
             increment_read_pointer = '0;
@@ -255,11 +253,12 @@ module Framebuffer_Wishbone #(
             mig_if.app_cmd         = MIG_CMD_READ;
             increment_read_pointer = '0;
         end
-        mig_if.app_wdf_data = pixel_buffer; //timing datapath only
+        mig_if.app_wdf_data = pixel_buffer_cdc;
         mig_if.app_wdf_mask = '1;
         mig_if.app_wdf_end = '1; //only write one at a time in current design
         mig_if.app_ref_req = '0;
         mig_if.app_zq_req  = '0;
+        writing = do_write;
     end: p_mig_control
     
     /////////////////// FIFO to pixel clock domain ///////////////
@@ -275,6 +274,20 @@ module Framebuffer_Wishbone #(
 // |   Setting USE_ADV_FEATURES[11] to 1 enables almost_empty flag; Default value of this bit is 0                       |
 // |   Setting USE_ADV_FEATURES[12] to 1 enables data_valid flag;   Default value of this bit is 0  
 
+
+    localparam FIFO_HIGH_FILL_READ = FIFO_HIGH_FILL*4;
+    logic [FIFO_WRITE_COUNT_WIDTH+2-1:0] fifo_read_count;
+    logic fifo_resetting_rd;
+    always_ff @(posedge clk_dvi) begin: p_startup_ready
+        if (fifo_resetting_rd) begin
+            framebuffer_ready <= '0;
+        end else if (fifo_read_count >= FIFO_HIGH_FILL_READ) begin
+            framebuffer_ready <= '1;
+        end
+    end: p_startup_ready
+    
+    logic [31:0] fifo_dout;
+
     xpm_fifo_async #(
         .CDC_SYNC_STAGES(3),
         .DOUT_RESET_VALUE("0"),
@@ -285,11 +298,11 @@ module Framebuffer_Wishbone #(
         .PROG_FULL_THRESH(10),
         .RD_DATA_COUNT_WIDTH(FIFO_WRITE_COUNT_WIDTH+2),
         .READ_DATA_WIDTH(FIFO_READ_WIDTH),
-        .READ_MODE("fwft"),
-        .FIFO_READ_LATENCY(0),
+        .READ_MODE("std"),
+        .FIFO_READ_LATENCY(1),
         .RELATED_CLOCKS(0),
         .SIM_ASSERT_CHK(0),
-        .USE_ADV_FEATURES("0707"),
+        .USE_ADV_FEATURES("1707"),
         .WAKEUP_TIME(0),
         .WRITE_DATA_WIDTH(FIFO_WRITE_WIDTH),
         .FIFO_WRITE_DEPTH(FIFO_WRITE_DEPTH),
@@ -302,8 +315,7 @@ module Framebuffer_Wishbone #(
         .full(),
         .overflow(), .underflow(),
         .prog_empty(), .prog_full(),
-        .rd_data_count(),
-        .rd_rst_busy(), .wr_rst_busy(),
+        .wr_rst_busy(),
         .sbiterr(), .injectsbiterr(),
         .wr_ack(),
         
@@ -315,9 +327,13 @@ module Framebuffer_Wishbone #(
         .din(       mig_if.app_rd_data ),
         
         .rd_clk(    clk_dvi     ),
+        .rd_rst_busy(fifo_resetting_rd),
+        .rd_data_count(fifo_read_count),
         .rd_en(     framebuffer_pull ),
-        .dout(      framebuffer_data  ),
+        .dout(      fifo_dout  ),
         .data_valid(framebuffer_valid )
     );
     
-endmodule: Framebuffer_Wishbone
+    assign framebuffer_data = fifo_dout[23:0];
+    
+endmodule: framebuffer_Wishbone

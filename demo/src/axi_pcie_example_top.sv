@@ -1,4 +1,6 @@
 
+import pkg_mig_framebuffer::*;
+
 module axi_pcie_example_top #( 
     parameter L = 1
 ) (
@@ -152,6 +154,7 @@ module axi_pcie_example_top #(
     
     logic       clk_neo;
     logic       clk_dvi, clk_dvi5x;
+    logic       clk200;
     logic       mmcm_locked;
     logic       rst_neorv32;
     logic [7:0] gpio;
@@ -161,6 +164,7 @@ module axi_pcie_example_top #(
     clock_wrapper clock_wrapper_inst (
         .CLK200_P, 
         .CLK200_N,
+        .clk200,
         .clk_neo,    // 99 MHz
         .clk_dvi,    // 148.5 MHz
         .clk_dvi5x,  // 742.5 MHz
@@ -241,14 +245,14 @@ module axi_pcie_example_top #(
 
     ///////////////////// HDMI/DVI ////////////////////////////
     
-    MIG_intf #(.DW(128), .AW(30) ) 
+    MIG_intf #(.DW(MIG_DATA_WIDTH), .AW(MIG_ADDR_WIDTH) ) 
     mig_if();
 
     logic framebuffer_ready, framebuffer_pull, framebuffer_valid;
-    logic [31:0]   framebuffer_data;
+    RGB888_t framebuffer_data;
 
-    Framebuffer_Wishbone #(
-        .BASE_ADDR( 32'h4000_0000 )
+    framebuffer_Wishbone #(
+        .BASE_ADDR( 32'h4000_1000 )
     ) framebuffer_inst (
         .wb(    wb_neo),
         .mig_if,
@@ -263,17 +267,9 @@ module axi_pcie_example_top #(
         .* //connected to framebuffer and top level ports
     );
     
-    tmds_xmitter #(
-        .invert(1'b0)
-    ) xmit_clock (
-        .clk(clk_dvi), 
-        .rst('0),
-        .clk5x(clk_dvi5x),
-        .datain(10'b1010101010),
-        .txp(HDMI_CK_P), 
-        .txn(HDMI_CK_N)
+    hdmi_xmitter my_hdmi_xmit(
+        .* //connected to framebuffer and top level ports
     );
-    
 
 endmodule: axi_pcie_example_top
 

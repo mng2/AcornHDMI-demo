@@ -36,10 +36,6 @@ package pkg_dvi;
         dvi_control_t   control;
     } tmds_decoded_t;
     
-    typedef struct packed {
-        byte_t red, green, blue;
-    } RGB888_t;
-    
     // a synthesizable version of $countones, restricted to a byte
     // can only return up to 8 despite return type
     function automatic int countones(

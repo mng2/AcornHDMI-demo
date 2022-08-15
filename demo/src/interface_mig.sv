@@ -12,7 +12,7 @@ interface MIG_intf
     logic [DW/8-1:0]app_wdf_mask;
     logic           app_wdf_end;
     logic           app_wdf_wren;
-    logic           app_rd_data;
+    logic [DW-1:0]  app_rd_data;
     logic           app_rd_data_end;
     logic           app_rd_data_valid;
     logic           app_rdy;

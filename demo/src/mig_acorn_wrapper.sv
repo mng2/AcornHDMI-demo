@@ -16,7 +16,7 @@ module mig_acorn_wrapper(
     output [0:0]    ddr3_odt,
     
     MIG_intf.MIG    mig_if,
-    input           CLK200_P, CLK200_N,
+    input           clk200,
     input           sys_resetn
 );
 
@@ -58,8 +58,8 @@ module mig_acorn_wrapper(
 
         .app_sr_req     ('0), //reserved
         .app_sr_active  (),
-        .sys_clk_p      (CLK200_P),
-        .sys_clk_n      (CLK200_N),
+        .device_temp    (),
+        .sys_clk_i      (clk200),
         .sys_rst        (sys_resetn)
     );
 

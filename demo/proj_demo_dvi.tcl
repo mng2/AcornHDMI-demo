@@ -156,8 +156,14 @@ set files [list \
  [file normalize "${origin_dir}/../ip/neorv32/rtl/core/neorv32_application_image.vhd"] \
  [file normalize "${origin_dir}/src/interface_axi.sv"] \
  [file normalize "${origin_dir}/src/interface_wishbone.sv"] \
+ [file normalize "${origin_dir}/src/interface_mig.sv"] \
+ [file normalize "${origin_dir}/src/pkg_dvi.sv"] \
+ [file normalize "${origin_dir}/src/pkg_mig_framebuffer.sv"] \
  [file normalize "${origin_dir}/src/clock_wrapper.sv"] \
+ [file normalize "${origin_dir}/src/mig_acorn_wrapper.sv"] \
  [file normalize "${origin_dir}/src/tmds_xmitter.sv"] \
+ [file normalize "${origin_dir}/src/hdmi_xmitter.sv"] \
+ [file normalize "${origin_dir}/src/framebuffer_wishbone.sv"] \
  [file normalize "${origin_dir}/src/xadc_wishbone.sv"] \
  [file normalize "${origin_dir}/src/fake_16550A.sv"] \
  [file normalize "${origin_dir}/src/axi_pcie_wrapper.sv"] \

@@ -1,4 +1,6 @@
 
+import pkg_dvi::*;
+
 module hdmi_xmitter(
     input           clk_dvi,
     input           clk_dvi5x,
@@ -6,7 +8,8 @@ module hdmi_xmitter(
     
     input           framebuffer_ready,
     output          framebuffer_pull,
-    input [31:0]    framebuffer_data
+    input RGB888_t  framebuffer_data,
+    input           framebuffer_valid,
     
     output          HDMI_CK_P, HDMI_CK_N,
     output          HDMI_D0_P, HDMI_D0_N,
@@ -14,6 +17,18 @@ module hdmi_xmitter(
     output          HDMI_D2_P, HDMI_D2_N
 );
 
+    // need to hold OSERDES in reset for a few extra cycles
+    logic xmitter_reset;
+    logic [3:0] startup_pipe;
+    always_ff @(posedge clk_dvi) begin
+        if (~mmcm_locked) begin
+            startup_pipe <= '1;
+        end else begin
+            startup_pipe <= {startup_pipe[2:0], 1'b0};
+        end
+        xmitter_reset <= |startup_pipe;
+    end
+        
     /////////////////// final encode ///////////////////////////
     // blue C0: HSync
     // blue C1: VSync
@@ -31,7 +46,7 @@ module hdmi_xmitter(
     
     always_ff @(posedge clk_dvi) begin
         if (xmitter_reset) begin
-            Hcounter <= '1;
+            Hcounter <= '1; //startup outside active area
             Vcounter <= '1;
         end else if (framebuffer_ready) begin
             if (Hcounter >= (H_FULL-1)) begin
@@ -49,6 +64,14 @@ module hdmi_xmitter(
         end
     end
     
+    assign framebuffer_pull = active_area;
+    
+    logic vsync_p1, hsync_p1;
+    always_ff @(posedge clk_dvi) begin
+        vsync_p1 <= vsync;
+        hsync_p1 <= hsync;
+    end
+    
     tmds_encoded_t encoded_red, encoded_green, encoded_blue;
     
     always_ff @(posedge clk_dvi) begin
@@ -57,17 +80,17 @@ module hdmi_xmitter(
             encoded_green   <= '0;
             encoded_blue    <= '0;
         end else begin
-            encoded_red     <= tmds_encode( .data_in(dai), 
-                                            .data_en(active_area), 
+            encoded_red     <= tmds_encode( .data_in(framebuffer_data.red), 
+                                            .data_en(framebuffer_valid), 
                                             .control(2'b0), 
                                             .disparity(encoded_red.disparity) );
-            encoded_green   <= tmds_encode( .data_in(dai), 
-                                            .data_en(active_area), 
+            encoded_green   <= tmds_encode( .data_in(framebuffer_data.green), 
+                                            .data_en(framebuffer_valid), 
                                             .control(2'b0), 
                                             .disparity(encoded_green.disparity) );
-            encoded_blue    <= tmds_encode( .data_in(dai), 
-                                            .data_en(active_area), 
-                                            .control({vsync, hsync}), 
+            encoded_blue    <= tmds_encode( .data_in(framebuffer_data.blue), 
+                                            .data_en(framebuffer_valid), 
+                                            .control({vsync_p1, hsync_p1}), 
                                             .disparity(encoded_blue.disparity) );
         end
     end
