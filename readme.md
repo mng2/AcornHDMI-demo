@@ -33,6 +33,27 @@ RISC-V toolchain. On Ubuntu 21.04 supposedly the `gcc-riscv64-unknown-elf` packa
 is what you need, but on Ubuntu 20.04 it doesn't seem to work.
 It may be simplest to manually install the [binary package](https://github.com/stnolting/riscv-gcc-prebuilt).
 
+### NEORV32 Wishbone Memory Map
+```
+0x4000_0000: XADC (temporarily disabled)
+
+0x4000_1000: Framebuffer
+             0x00, 32-bit, RW: write buffer 0
+             0x04, 32-bit, RW: write buffer 1
+             0x08, 32-bit, RW: write buffer 2
+             0x0c, 32-bit, RW: write buffer 3
+             0x10, 32-bit, RW: MIG write pointer
+             0x14, 32-bit, RW: Command reg
+                               bit  0: write pixels
+                               bit  4: flip buffers
+             0x18, 32-bit, RO: Status reg
+                               bit  0: write ack
+                               bit  4: active buffer
+                               bit  8: MIG cal done
+                               bit 10: FIFO overflow
+                               bit 11: FIFO underflow
+```
+
 ## Build Process
 To build with the default program in the softcore,
 use the TCL console in Vivado. 
