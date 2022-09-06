@@ -1,5 +1,5 @@
 // simple Wishbone 
-// blocks bus while transacting
+// single-cycle turnaround
 
 /* Wishbone Datasheet
 General description:    
@@ -49,9 +49,10 @@ module framebuffer_Wishbone #(
     localparam          FLIP_BUFFERS    = 4;
     logic       [31:0] status_reg;
     localparam          WRITE_ACK       = 0;
-    localparam          CURRENT_BUFFER  = 12;
-    localparam          MIG_READY       = 16;
-    localparam          MIG_CAL_DONE    = 17;
+    localparam          ACTIVE_BUFFER   = 4;
+    localparam          MIG_CAL_DONE    = 8;
+    localparam          FIFO_OVERFLOW   = 10;
+    localparam          FIFO_UNDERFLOW  = 11;
 
     always_ff @(posedge wb.clk) begin: p_wishbone
         if (wb.rst) begin
@@ -194,14 +195,17 @@ module framebuffer_Wishbone #(
         end
     end
     
+    logic fifo_overflow, fifo_underflow;
+
     assign status_reg_mig = 32'b0 + 
                             (write_done     << WRITE_ACK) +
-                            (current_buffer << CURRENT_BUFFER) +
-                            (mig_if.app_rdy << MIG_READY) +
-                            (mig_if.init_calib_complete << MIG_CAL_DONE);
+                            (current_buffer << ACTIVE_BUFFER) +
+                            (mig_if.init_calib_complete << MIG_CAL_DONE) +
+                            (fifo_overflow << FIFO_OVERFLOW) +
+                            (fifo_underflow << FIFO_UNDERFLOW);
     
     localparam FIFO_WRITE_WIDTH = MIG_DATA_WIDTH; // 128
-    localparam FIFO_WRITE_DEPTH = 256; // 36Kb but split over 
+    localparam FIFO_WRITE_DEPTH = 256;
     localparam FIFO_WRITE_COUNT_WIDTH = 9; // $clog2(FIFO_WRITE_DEPTH); bugged in 2019.2 sim
     localparam FIFO_READ_WIDTH = 32;
     logic [FIFO_WRITE_COUNT_WIDTH-1:0] fifo_write_count;
@@ -313,13 +317,14 @@ module framebuffer_Wishbone #(
         .dbiterr(), .injectdbiterr(),
         .empty(),
         .full(),
-        .overflow(), .underflow(),
         .prog_empty(), .prog_full(),
         .wr_rst_busy(),
         .sbiterr(), .injectsbiterr(),
         .wr_ack(),
         
         .sleep('0),
+        .overflow(fifo_overflow), 
+        .underflow(fifo_underflow),
         .wr_data_count(fifo_write_count),
         .wr_clk(    mig_if.clk  ),
         .rst(       mig_if.rst  ),

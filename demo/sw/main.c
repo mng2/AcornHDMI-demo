@@ -50,6 +50,9 @@
 #define XADC_VCCAUX (*((volatile uint32_t*) (0x40000008UL)))
 #define XADC_LTC    (*((volatile uint32_t*) (0x40000078UL)))
 
+#define FBUF_CMD    (*((volatile uint32_t*) (0x40001014UL)))
+#define FBUF_STATUS (*((volatile uint32_t*) (0x40001018UL)))
+
 #define PCA9534_I2C_ADDR    0x40 // 0x40 write / 0x41 read
 #define I2C_WRITE           0
 #define I2C_READ            1
@@ -57,6 +60,14 @@
 #define PCA9534_REG_OUTPUT  0x01
 #define PCA9534_REG_INVERT  0x02
 #define PCA9534_REG_CONFIG  0x03
+#define HDMI_LED            5
+#define HDMI_OE_N           2
+#define HDMI_HOTPLUG_DET    3   //input
+#define HDMI_PREEMPH0       0
+#define HDMI_PREEMPH1       1
+#define HDMI_DONGLE_DET     7
+#define HDMI_DDC_SHIFT_EN   6
+#define HDMI_CEC            4   //inout
 
 void write_PCA9534_reg(uint8_t reg, uint8_t val);
 
@@ -93,9 +104,18 @@ int main() {
     // f = fmain / 4 / PRSC = 100e6 / 4 / 2048 = ~12.2 kHz
     neorv32_twi_setup(CLK_PRSC_2048);
     neorv32_cpu_delay_ms(100);
-    //set amber LED to output
-    write_PCA9534_reg( PCA9534_REG_CONFIG, (0xFF ^ (1 << 5)));
-    uint8_t pca_output  = 0xFF;
+    // set default outputs
+    uint8_t pca_output =    (1 << HDMI_LED) +
+                            (1 << HDMI_OE_N) +
+                            (1 << HDMI_HOTPLUG_DET) +
+                            (0 << HDMI_PREEMPH0) +
+                            (0 << HDMI_PREEMPH1) +
+                            (0 << HDMI_DONGLE_DET) +
+                            (0 << HDMI_DDC_SHIFT_EN) +
+                            (1 << HDMI_CEC);
+    write_PCA9534_reg(PCA9534_REG_OUTPUT, pca_output);
+    // set all pins to out except
+    write_PCA9534_reg( PCA9534_REG_CONFIG, (1 << HDMI_HOTPLUG_DET) + (1 << HDMI_CEC) );
 
     char rx = 0;
     // Main menu
@@ -104,16 +124,27 @@ int main() {
             rx = neorv32_uart0_char_received_get();
             if (rx=='r') {
                 neorv32_uart0_printf("r received, rebooting!\n");
-                neorv32_gpio_port_set(0xFF);
-            } else if (rx=='x') {
+                neorv32_gpio_port_set(0xFF); // bit 7 to reset
+            } else if (rx=='s') {
+                neorv32_uart0_printf("status: %x\n", FBUF_STATUS);
+            } else if (rx=='o') {
+                neorv32_uart0_printf("HDMI buffer turned");
+                pca_output ^= (1 << HDMI_OE_N);
+                write_PCA9534_reg(PCA9534_REG_OUTPUT, pca_output);
+                if (pca_output & (1 << HDMI_OE_N)) {
+                    neorv32_uart0_printf("OFF\n");
+                } else {
+                    neorv32_uart0_printf("ON\n");
+                }
+        /*    } else if (rx=='x') {
                 neorv32_uart0_printf("temp: %x\n", XADC_TEMP);
                 neorv32_uart0_printf("vint: %x\n", XADC_VCCINT);
                 neorv32_uart0_printf("vaux: %x\n", XADC_VCCAUX);
-                neorv32_uart0_printf("vLTC: %x\n", XADC_LTC);
+                neorv32_uart0_printf("vLTC: %x\n", XADC_LTC);       */
             } else {
                 neorv32_uart0_printf("Menu: enter 'r' to reboot\n");
             }
-            pca_output ^= (1 << 5);
+            pca_output ^= (1 << HDMI_LED);
             write_PCA9534_reg(PCA9534_REG_OUTPUT, pca_output);
         }
 
