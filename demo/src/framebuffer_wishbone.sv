@@ -1,9 +1,9 @@
 // simple Wishbone 
-// single-cycle turnaround
+// next-cycle turnaround
 
 /* Wishbone Datasheet
 General description:    
-Supported cycles:       S R/W; S BLOCK R/W; S RMW
+Supported cycles:       S R/W
 Data port, size:        32-bit
 Data port, granularity: 32-bit
 Data port, max op size: 32-bit
@@ -22,6 +22,7 @@ module framebuffer_Wishbone #(
 )(
     Wishbone_intf.S wb,
     MIG_intf.APP    mig_if,
+    output          mig_resetn,
     
     output logic    framebuffer_ready,
     input           framebuffer_pull,
@@ -47,6 +48,7 @@ module framebuffer_Wishbone #(
     logic       [31:0] command_reg;
     localparam          WRITE_PIXELS    = 0;
     localparam          FLIP_BUFFERS    = 4;
+    localparam          MIG_ON          = 8;
     logic       [31:0] status_reg;
     localparam          WRITE_ACK       = 0;
     localparam          ACTIVE_BUFFER   = 4;
@@ -54,10 +56,13 @@ module framebuffer_Wishbone #(
     localparam          FIFO_OVERFLOW   = 10;
     localparam          FIFO_UNDERFLOW  = 11;
 
+    assign mig_resetn = command_reg[MIG_ON];
+
     always_ff @(posedge wb.clk) begin: p_wishbone
         if (wb.rst) begin
             command_reg <= '0;
-        end else if (wb.stb & addr_match) begin
+            wb.data_o   <= '0;
+        end else if (wb.stb & addr_match & ~wb.ack) begin
             if (wb.we) begin
                 case (addr)
                     0,1,2,3:    pixel_buffer[addr]  <= wb.data_i;
@@ -74,14 +79,18 @@ module framebuffer_Wishbone #(
                     default:    wb.data_o   <= '0;
                 endcase
             end
+        end
+        if (wb.rst) begin
+            wb.ack <= '0;
+        end else if (wb.stb & addr_match & ~wb.ack) begin
+            wb.ack <= '1;
         end else begin
-            wb.data_o   <= '0;
+            wb.ack <= '0;
         end
     end: p_wishbone
     
     always_comb begin
         wb.err  = '0;
-        wb.ack  = (wb.stb & addr_match);
     end
 
     /////////////////////// Interface CDC ////////////////////////////

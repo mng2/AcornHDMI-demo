@@ -50,8 +50,26 @@
 #define XADC_VCCAUX (*((volatile uint32_t*) (0x40000008UL)))
 #define XADC_LTC    (*((volatile uint32_t*) (0x40000078UL)))
 
+#define FBUF_PIX0   (*((volatile uint32_t*) (0x40001000UL)))
+#define FBUF_PIX1   (*((volatile uint32_t*) (0x40001004UL)))
+#define FBUF_PIX2   (*((volatile uint32_t*) (0x40001008UL)))
+#define FBUF_PIX3   (*((volatile uint32_t*) (0x4000100cUL)))
 #define FBUF_CMD    (*((volatile uint32_t*) (0x40001014UL)))
 #define FBUF_STATUS (*((volatile uint32_t*) (0x40001018UL)))
+
+enum FBUF_CMD_enum {
+    FBUF_CMD_WRITE_PIXELS    = 0,
+    FBUF_CMD_FLIP_BUFFERS    = 4,
+    FBUF_CMD_MIG_ON          = 8
+};
+
+enum FBUF_STATUS_enum {
+    FBUF_STATUS_WRITE_ACK       = 0,
+    FBUF_STATUS_ACTIVE_BUFFER   = 4,
+    FBUF_STATUS_MIG_CAL_DONE    = 8,
+    FBUF_STATUS_FIFO_OVERFLOW   = 10,
+    FBUF_STATUS_FIFO_UNDERFLOW  = 11
+};
 
 #define PCA9534_I2C_ADDR    0x40 // 0x40 write / 0x41 read
 #define I2C_WRITE           0
@@ -79,12 +97,10 @@ void write_PCA9534_reg(uint8_t reg, uint8_t val);
  *
  * @return 0 if execution was successful
  **************************************************************************/
-int main() {
+int 
+main() 
+{
 
-    int cnt = 0;
-    int pwm = 1;
-    int up = 1;
-    const int PWM_PERIOD_MS = 16; // 60ish Hz
     neorv32_gpio_port_set(0); // clear gpio output
 
     // check if UART unit is implemented at all
@@ -105,7 +121,7 @@ int main() {
     neorv32_twi_setup(CLK_PRSC_2048);
     neorv32_cpu_delay_ms(100);
     // set default outputs
-    uint8_t pca_output =    (1 << HDMI_LED) +
+    uint8_t pca_output =    (0 << HDMI_LED) +
                             (1 << HDMI_OE_N) +
                             (1 << HDMI_HOTPLUG_DET) +
                             (0 << HDMI_PREEMPH0) +
@@ -117,6 +133,8 @@ int main() {
     // set all pins to out except
     write_PCA9534_reg( PCA9534_REG_CONFIG, (1 << HDMI_HOTPLUG_DET) + (1 << HDMI_CEC) );
 
+    uint8_t timeout = 0;
+    uint8_t acorn_LEDs = 0;
     char rx = 0;
     // Main menu
     for (;;) {
@@ -127,8 +145,28 @@ int main() {
                 neorv32_gpio_port_set(0xFF); // bit 7 to reset
             } else if (rx=='s') {
                 neorv32_uart0_printf("status: %x\n", FBUF_STATUS);
+            } else if (rx=='m') {
+                if (FBUF_STATUS & (1 << FBUF_STATUS_MIG_CAL_DONE)) {
+                    neorv32_uart0_printf("MIG is already active\n");
+                } else {
+                    neorv32_uart0_printf("Turning MIG on");
+                    FBUF_CMD |= (1 << FBUF_CMD_MIG_ON);
+                    timeout = 1;
+                    while ( (0==(FBUF_STATUS & (1 << FBUF_STATUS_MIG_CAL_DONE))) | (timeout != 0)) {
+                        timeout++;
+                        neorv32_cpu_delay_ms(100);
+                        neorv32_uart0_printf(".");
+                    }
+                    if (FBUF_STATUS & (1 << FBUF_STATUS_MIG_CAL_DONE)) {
+                        neorv32_uart0_printf("\ndone\n");
+                    } else {
+                        neorv32_uart0_printf("\nERROR: timed out\n");
+                    }
+                }
             } else if (rx=='o') {
-                neorv32_uart0_printf("HDMI buffer turned");
+                pca_output ^= (1 << HDMI_LED);
+                write_PCA9534_reg(PCA9534_REG_OUTPUT, pca_output);
+                neorv32_uart0_printf("HDMI buffer turned ");
                 pca_output ^= (1 << HDMI_OE_N);
                 write_PCA9534_reg(PCA9534_REG_OUTPUT, pca_output);
                 if (pca_output & (1 << HDMI_OE_N)) {
@@ -144,23 +182,10 @@ int main() {
             } else {
                 neorv32_uart0_printf("Menu: enter 'r' to reboot\n");
             }
-            pca_output ^= (1 << HDMI_LED);
-            write_PCA9534_reg(PCA9534_REG_OUTPUT, pca_output);
+            acorn_LEDs ^= 1;
+            neorv32_gpio_port_set(acorn_LEDs);
         }
 
-        // use delay_ms to do software PWM on the count
-        // for a fade effect
-        neorv32_gpio_port_set(cnt & 0x0F);
-        neorv32_cpu_delay_ms(pwm);
-        neorv32_gpio_port_set(0x0);    
-        neorv32_cpu_delay_ms(PWM_PERIOD_MS-pwm);
-        if (pwm==PWM_PERIOD_MS) {
-            up = 0;
-        } else if (pwm==0) {
-            up = 1;
-            cnt = cnt + 1;
-        }
-        pwm = up ? pwm+1 : pwm-1;  
     }
 
     return 0;

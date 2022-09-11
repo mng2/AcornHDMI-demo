@@ -46,6 +46,7 @@ It may be simplest to manually install the [binary package](https://github.com/s
              0x14, 32-bit, RW: Command reg
                                bit  0: write pixels
                                bit  4: flip buffers
+                               bit  8: MIG on
              0x18, 32-bit, RO: Status reg
                                bit  0: write ack
                                bit  4: active buffer

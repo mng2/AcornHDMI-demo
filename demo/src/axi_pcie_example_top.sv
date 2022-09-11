@@ -247,6 +247,7 @@ module axi_pcie_example_top #(
     
     MIG_intf #(.DW(MIG_DATA_WIDTH), .AW(MIG_ADDR_WIDTH) ) 
     mig_if();
+    logic mig_resetn;
 
     logic framebuffer_ready, framebuffer_pull, framebuffer_valid;
     RGB888_t framebuffer_data;
@@ -256,6 +257,7 @@ module axi_pcie_example_top #(
     ) framebuffer_inst (
         .wb(    wb_neo),
         .mig_if,
+        .mig_resetn,
         .framebuffer_ready,
         .framebuffer_pull,
         .framebuffer_data,
@@ -264,7 +266,8 @@ module axi_pcie_example_top #(
     );
 
     mig_acorn_wrapper my_mig(
-        .* //connected to framebuffer and top level ports
+        .*, //connected to framebuffer and top level ports
+        .sys_resetn(mig_resetn)
     );
     
     hdmi_xmitter my_hdmi_xmit(
